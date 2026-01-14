@@ -3,185 +3,511 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-
-  <!-- مهم لتفادي Error 153 عندما يكون referrer ممنوع -->
   <meta name="referrer" content="strict-origin-when-cross-origin" />
+  <title>مشغل فيديو احترافي (حتى 12x)</title>
 
-  <title>YouTube Embed (Fix 153) + Speed</title>
+  <!-- خط عربي ممتاز -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
 
   <style>
-    body{font-family:Arial,sans-serif;background:#0b0f17;color:#e8eefc;margin:0;padding:24px}
-    .wrap{max-width:980px;margin:0 auto}
-    .card{background:#121a2a;border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:16px}
-    .player-box{position:relative;width:100%;aspect-ratio:16/9;border-radius:14px;overflow:hidden;background:#000}
-    #player{width:100%;height:100%}
-    .row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:12px}
-    button,select,input[type="range"]{border-radius:10px;border:1px solid rgba(255,255,255,.12);background:#0f1626;color:#e8eefc;padding:10px 12px;font-size:14px}
-    button{cursor:pointer}
-    .label{font-size:13px;opacity:.9}
+    :root{
+      --bg1:#070a12;
+      --bg2:#0b1226;
+      --card:rgba(255,255,255,.06);
+      --stroke:rgba(255,255,255,.14);
+      --text:#eaf0ff;
+      --muted:rgba(234,240,255,.72);
+      --shadow: 0 18px 60px rgba(0,0,0,.45);
+      --shadow2: 0 10px 28px rgba(0,0,0,.35);
+      --radius: 18px;
+      --radius2: 14px;
+      --ease: cubic-bezier(.2,.8,.2,1);
+    }
+
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:"Tajawal", system-ui, -apple-system, Segoe UI, Arial, sans-serif;
+      color:var(--text);
+      min-height:100vh;
+      background:
+        radial-gradient(1100px 520px at 15% 10%, rgba(122,162,255,.18), transparent 60%),
+        radial-gradient(980px 480px at 85% 20%, rgba(193,112,255,.14), transparent 55%),
+        radial-gradient(900px 520px at 40% 100%, rgba(72,255,197,.10), transparent 60%),
+        linear-gradient(180deg, var(--bg1), var(--bg2));
+      padding: 26px 14px;
+    }
+
+    .wrap{max-width: 1020px; margin: 0 auto;}
+
+    .header{
+      display:flex; gap:14px; align-items:center; justify-content:space-between;
+      margin-bottom:14px;
+    }
+    .title{
+      display:flex; flex-direction:column; gap:4px;
+    }
+    .title h1{
+      margin:0;
+      font-size: 20px;
+      letter-spacing:.2px;
+    }
+    .title p{
+      margin:0;
+      color:var(--muted);
+      font-size: 13px;
+      line-height:1.6;
+    }
+
+    .badge{
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.08);
+      border:1px solid rgba(255,255,255,.14);
+      color: rgba(234,240,255,.85);
+      font-size: 13px;
+      box-shadow: var(--shadow2);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+
+    .card{
+      background: var(--card);
+      border: 1px solid var(--stroke);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow:hidden;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      position: relative;
+    }
+
+    /* Glow */
+    .card::before{
+      content:"";
+      position:absolute;
+      inset:-2px;
+      background: radial-gradient(600px 260px at 20% 0%, rgba(122,162,255,.22), transparent 55%),
+                  radial-gradient(520px 240px at 90% 10%, rgba(193,112,255,.18), transparent 55%);
+      opacity:.55;
+      pointer-events:none;
+    }
+
+    .playerShell{
+      position:relative;
+      padding: 14px;
+    }
+
+    .videoWrap{
+      position:relative;
+      width:100%;
+      aspect-ratio: 16/9;
+      border-radius: var(--radius2);
+      overflow:hidden;
+      background:#000;
+      border:1px solid rgba(255,255,255,.12);
+      box-shadow: 0 14px 50px rgba(0,0,0,.45);
+      transform: translateZ(0);
+    }
+
+    video{
+      width:100%;
+      height:100%;
+      display:block;
+      background:#000;
+    }
+
+    /* Overlay (التحكم فوق الفيديو بشكل فخم) */
+    .overlay{
+      position:absolute;
+      inset:0;
+      pointer-events:none;
+      background: linear-gradient(180deg, rgba(0,0,0,.25), transparent 24%, transparent 70%, rgba(0,0,0,.45));
+      opacity: .85;
+      transition: opacity .35s var(--ease);
+    }
+
+    .videoWrap:hover .overlay{opacity:1}
+
+    .controls{
+      margin-top: 14px;
+      display:grid;
+      gap: 12px;
+      position:relative;
+      z-index:1;
+    }
+
+    .row{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      align-items:center;
+    }
+
+    .btn{
+      display:inline-flex;
+      align-items:center;
+      gap:10px;
+      padding: 10px 12px;
+      border-radius: 14px;
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(10,14,26,.55);
+      color: var(--text);
+      cursor:pointer;
+      user-select:none;
+      transition: transform .15s var(--ease), background .2s var(--ease), border-color .2s var(--ease);
+      box-shadow: 0 10px 24px rgba(0,0,0,.22);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+    .btn:hover{
+      background: rgba(255,255,255,.10);
+      border-color: rgba(255,255,255,.20);
+      transform: translateY(-1px);
+    }
+    .btn:active{transform: translateY(0px) scale(.99)}
+    .btn.secondary{opacity:.9}
+    .btn.danger{background: rgba(255, 90, 90, .10); border-color: rgba(255, 90, 90, .22)}
+    .btn.danger:hover{background: rgba(255, 90, 90, .16); border-color: rgba(255, 90, 90, .32)}
+
+    .icon{width:18px;height:18px;display:inline-block}
     .spacer{flex:1}
-    .time{font-variant-numeric:tabular-nums;opacity:.9;font-size:13px;min-width:120px;text-align:center}
-    input[type="range"]{width:260px;padding:0;height:34px}
-    .small{font-size:12px;opacity:.75;line-height:1.6;margin-top:10px}
+
+    .pill{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      padding: 10px 12px;
+      border-radius: 14px;
+      border:1px solid rgba(255,255,255,.12);
+      background: rgba(10,14,26,.45);
+      box-shadow: 0 10px 24px rgba(0,0,0,.18);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      min-width: 280px;
+    }
+
+    .label{font-size:13px;color:rgba(234,240,255,.8)}
+    .time{
+      font-variant-numeric: tabular-nums;
+      color: rgba(234,240,255,.9);
+      font-size: 13px;
+      min-width: 130px;
+      text-align:center;
+      padding-inline: 6px;
+    }
+
+    input[type="range"]{
+      width: 260px;
+      height: 32px;
+      background: transparent;
+      accent-color: #a6c1ff;
+      cursor:pointer;
+    }
+
+    select{
+      padding: 10px 12px;
+      border-radius: 14px;
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(10,14,26,.55);
+      color: var(--text);
+      outline:none;
+      cursor:pointer;
+      box-shadow: 0 10px 24px rgba(0,0,0,.18);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+
+    .note{
+      margin-top: 12px;
+      padding: 12px 14px;
+      border-radius: 14px;
+      border:1px solid rgba(255,255,255,.12);
+      background: rgba(10,14,26,.35);
+      color: rgba(234,240,255,.78);
+      line-height:1.75;
+      font-size: 13px;
+    }
+    code{word-break:break-all}
+
+    /* Toast */
+    .toast{
+      position: fixed;
+      left: 16px;
+      bottom: 16px;
+      padding: 10px 12px;
+      border-radius: 14px;
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(10,14,26,.70);
+      color: rgba(234,240,255,.92);
+      box-shadow: 0 16px 44px rgba(0,0,0,.45);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      opacity:0;
+      transform: translateY(10px);
+      transition: opacity .25s var(--ease), transform .25s var(--ease);
+      pointer-events:none;
+      font-size: 13px;
+      max-width: min(520px, calc(100vw - 32px));
+    }
+    .toast.show{opacity:1; transform: translateY(0)}
+
+    /* صغير */
+    @media (max-width: 650px){
+      .pill{min-width: 100%}
+      input[type="range"]{width: 190px}
+      .time{min-width:110px}
+    }
   </style>
 </head>
 
 <body>
   <div class="wrap">
+    <div class="header">
+      <div class="title">
+        <h1>مشغل فيديو HTML5 احترافي</h1>
+        <p>تحكم كامل + اختصارات كيبورد + سرعة حتى 12x (إذا كان المصدر MP4 فعلاً ويسمح).</p>
+      </div>
+      <div class="badge">Shortcuts: Space / M / ← → / ↑ ↓ / [ ]</div>
+    </div>
+
     <div class="card">
-      <div class="player-box">
-        <div id="player"></div>
-      </div>
+      <div class="playerShell">
+        <div class="videoWrap" id="videoWrap">
+          <video id="vid" playsinline preload="metadata">
+            <source
+              src="https://rr6---sn-uxaxjvhxbt2u-5atr.googlevideo.com/videoplayback?expire=1768454705&ei=0SVoaaKSGPyLr9gP5-Wd4As&ip=82.24.212.18&id=o-ADWTNrfi5SIaAb3TTAYmbHtoc83IDgbMxE0_B8J6D1SU&itag=18&source=youtube&requiressl=yes&xpc=EgVo2aDSNQ%3D%3D&rms=au%2Cau&bui=AW-iu_o8dGC8G2bbWUfhfA7ICaKH1l8bBS2M_gbocLOJrHM5zPV3Nh9N_0eEZxmY8JkysyD5LlDDxJA0&spc=q5xjPF2acw2qjzH2hyN4xnKdOvx_S2X-QYkVz_xL2CbMM5H9R08wy7zdK09wZtM8pX4&vprv=1&svpuc=1&mime=video%2Fmp4&rqh=1&gir=yes&clen=1024537169&ratebypass=yes&dur=21792.600&lmt=1767703145070983&fexp=51552689,51565115,51565682,51580968&c=ANDROID&txp=3309224&sparams=expire%2Cei%2Cip%2Cid%2Citag%2Csource%2Crequiressl%2Cxpc%2Cbui%2Cspc%2Cvprv%2Csvpuc%2Cmime%2Crqh%2Cgir%2Cclen%2Cratebypass%2Cdur%2Clmt&sig=AJfQdSswRQIhAPOs3P5k5phmfynduyC0yElwgz1uC3RylhbKw7L9w8NiAiBZLMSikEBvyT5Bb2xWLbRFLHe8TwaugAcxu1a3kpr28A%3D%3D&redirect_counter=1&rm=sn-q4fel776&rrc=104&req_id=c17d7d79fde4a3ee&cms_redirect=yes&cmsv=e&cps=0&ipbypass=yes&met=1768433108,&mh=vB&mip=156.218.34.191&mm=31&mn=sn-uxaxjvhxbt2u-5atr&ms=au&mt=1768431453&mv=u&mvi=6&pl=25&lsparams=cps,ipbypass,met,mh,mip,mm,mn,ms,mv,mvi,pl,rms&lsig=APaTxxMwRQIgF3bMwSxDbSF5eWmSdtSi2luxvOcv8Vm4bomP3SRTnVMCIQCl6qPg8as4puHzTykPO-6uu_dot8v89bFp-REpkOP_LA%3D%3D"
+              type="video/mp4"
+            />
+            متصفحك لا يدعم تشغيل الفيديو.
+          </video>
+          <div class="overlay"></div>
+        </div>
 
-      <div class="row">
-        <button id="playBtn">تشغيل</button>
-        <button id="pauseBtn">إيقاف مؤقت</button>
-        <button id="stopBtn">إيقاف</button>
-        <div class="spacer"></div>
-        <button id="muteBtn">كتم</button>
-        <button id="unmuteBtn">إلغاء الكتم</button>
-      </div>
+        <div class="controls">
 
-      <div class="row">
-        <span class="label">التقدم:</span>
-        <input id="seek" type="range" min="0" max="1000" value="0" />
-        <span class="time" id="timeText">00:00 / 00:00</span>
-      </div>
+          <div class="row">
+            <button class="btn" id="playBtn" title="تشغيل / Space">
+              <span class="icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M8 5v14l12-7L8 5Z" fill="currentColor"/></svg>
+              </span>
+              تشغيل
+            </button>
 
-      <div class="row">
-        <span class="label">الصوت:</span>
-        <input id="vol" type="range" min="0" max="100" value="80" />
-        <span class="label" id="volText">80%</span>
-        <div class="spacer"></div>
-        <span class="label">السرعة:</span>
-        <select id="speed">
-          <option value="0.25">0.25x</option>
-          <option value="0.5">0.5x</option>
-          <option value="0.75">0.75x</option>
-          <option value="1" selected>1x</option>
-          <option value="1.25">1.25x</option>
-          <option value="1.5">1.5x</option>
-          <option value="1.75">1.75x</option>
-          <option value="2">2x</option>
-          <option value="3">3x</option>
-          <option value="4">4x</option>
-          <option value="6">6x</option>
-          <option value="8">8x</option>
-          <option value="10">10x</option>
-          <option value="12">12x</option>
-        </select>
-        <button id="try12x">ضبط 12x</button>
-      </div>
+            <button class="btn secondary" id="pauseBtn" title="إيقاف مؤقت / Space">
+              <span class="icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M7 5h4v14H7V5Zm6 0h4v14h-4V5Z" fill="currentColor"/></svg>
+              </span>
+              إيقاف مؤقت
+            </button>
 
-      <div class="small">
-        إذا ظهر Error 153 غالبًا السبب Referrer-Policy أو فتح الملف بـ file://؛ شغّل الصفحة من localhost. :contentReference[oaicite:1]{index=1}
+            <button class="btn danger" id="stopBtn" title="إيقاف">
+              <span class="icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M7 7h10v10H7V7Z" fill="currentColor"/></svg>
+              </span>
+              إيقاف
+            </button>
+
+            <div class="spacer"></div>
+
+            <button class="btn secondary" id="muteBtn" title="كتم / M">
+              <span class="icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M4 10v4h4l5 4V6L8 10H4Z" fill="currentColor"/><path d="M16 9l4 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M20 9l-4 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              </span>
+              كتم
+            </button>
+
+            <button class="btn" id="unmuteBtn" title="إلغاء الكتم / M">
+              <span class="icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M4 10v4h4l5 4V6L8 10H4Z" fill="currentColor"/><path d="M16 9.5c1.5 1.5 1.5 3.5 0 5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M18 7c3 3 3 7 0 10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              </span>
+              صوت
+            </button>
+          </div>
+
+          <div class="row">
+            <div class="pill">
+              <span class="label">التقدم</span>
+              <input id="seek" type="range" min="0" max="1000" value="0" />
+              <span class="time" id="timeText">00:00 / 00:00</span>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="pill">
+              <span class="label">الصوت</span>
+              <input id="vol" type="range" min="0" max="100" value="80" />
+              <span class="label" id="volText">80%</span>
+            </div>
+
+            <div class="spacer"></div>
+
+            <select id="speed" title="السرعة / [ ]">
+              <option value="0.25">0.25x</option>
+              <option value="0.5">0.5x</option>
+              <option value="0.75">0.75x</option>
+              <option value="1" selected>1x</option>
+              <option value="1.25">1.25x</option>
+              <option value="1.5">1.5x</option>
+              <option value="2">2x</option>
+              <option value="3">3x</option>
+              <option value="4">4x</option>
+              <option value="6">6x</option>
+              <option value="8">8x</option>
+              <option value="10">10x</option>
+              <option value="12">12x</option>
+            </select>
+
+            <button class="btn" id="try12x" title="ضبط 12x">
+              <span class="icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm1 5v5.3l4 2.3-.9 1.6L11 13V7h2Z" fill="currentColor"/></svg>
+              </span>
+              12x
+            </button>
+          </div>
+
+          <div class="note">
+            <b>ملاحظة:</b> روابط <code>googlevideo</code> قد تتوقف فجأة لأنها مؤقتة أو تُرفض بسبب CORS. إذا الفيديو ما اشتغلش، استخدم ملف MP4 ثابت أو شغّله من سيرفر/نفس الدومين.
+          </div>
+
+        </div>
       </div>
     </div>
   </div>
 
-  <script src="https://www.youtube.com/iframe_api"></script>
+  <div class="toast" id="toast"></div>
+
   <script>
-    const VIDEO_ID = "g0Cst6bEyWs";
+    const vid = document.getElementById("vid");
+    const playBtn = document.getElementById("playBtn");
+    const pauseBtn = document.getElementById("pauseBtn");
+    const stopBtn = document.getElementById("stopBtn");
+    const muteBtn = document.getElementById("muteBtn");
+    const unmuteBtn = document.getElementById("unmuteBtn");
+    const seek = document.getElementById("seek");
+    const timeText = document.getElementById("timeText");
+    const vol = document.getElementById("vol");
+    const volText = document.getElementById("volText");
+    const speed = document.getElementById("speed");
+    const try12x = document.getElementById("try12x");
+    const toast = document.getElementById("toast");
 
-    let player, duration = 0, uiTimer = null, isSeeking = false;
+    let isSeeking = false;
+    let toastTimer = null;
 
-    function onYouTubeIframeAPIReady() {
-      player = new YT.Player("player", {
-        videoId: VIDEO_ID,
-        host: "https://www.youtube-nocookie.com", // يساعد في بعض الحالات
-        playerVars: {
-          controls: 0,
-          rel: 0,
-          modestbranding: 1,
-          playsinline: 1,
-          enablejsapi: 1,
-          origin: window.location.origin // مهم لتهيئة الإعدادات
-        },
-        events: { onReady: onReady, onStateChange: () => updateUI() }
-      });
+    function showToast(msg){
+      toast.textContent = msg;
+      toast.classList.add("show");
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(()=>toast.classList.remove("show"), 1300);
     }
 
-    function onReady() {
-      player.setVolume(80);
-      setPlaybackRateSmart(12);
-      wireUI();
-      uiTimer = setInterval(updateUI, 250);
-      updateUI();
+    function setRate(r){
+      vid.playbackRate = r;
+      speed.value = String(r);
+      showToast("السرعة: " + r + "x");
     }
 
-    function wireUI() {
-      const playBtn = document.getElementById("playBtn");
-      const pauseBtn = document.getElementById("pauseBtn");
-      const stopBtn = document.getElementById("stopBtn");
-      const muteBtn = document.getElementById("muteBtn");
-      const unmuteBtn = document.getElementById("unmuteBtn");
-      const seek = document.getElementById("seek");
-      const vol = document.getElementById("vol");
-      const volText = document.getElementById("volText");
-      const speed = document.getElementById("speed");
-      const try12x = document.getElementById("try12x");
+    function clamp(n,min,max){ return Math.min(max, Math.max(min, n)); }
 
-      playBtn.onclick = () => player.playVideo();
-      pauseBtn.onclick = () => player.pauseVideo();
-      stopBtn.onclick = () => { player.stopVideo(); updateUI(); };
-      muteBtn.onclick = () => player.mute();
-      unmuteBtn.onclick = () => player.unMute();
+    playBtn.onclick = async () => {
+      try{ await vid.play(); showToast("تشغيل"); } catch(e){ showToast("Autoplay ممنوع — اضغط تشغيل"); }
+    };
+    pauseBtn.onclick = () => { vid.pause(); showToast("إيقاف مؤقت"); };
+    stopBtn.onclick = () => { vid.pause(); vid.currentTime = 0; showToast("إيقاف"); };
 
-      seek.addEventListener("input", () => isSeeking = true);
-      seek.addEventListener("change", () => {
-        const v = Number(seek.value);
-        duration = player.getDuration() || duration || 0;
-        const t = duration ? (v / 1000) * duration : 0;
-        player.seekTo(t, true);
-        isSeeking = false;
-      });
+    muteBtn.onclick = () => { vid.muted = true; showToast("كتم"); };
+    unmuteBtn.onclick = () => { vid.muted = false; showToast("صوت"); };
 
-      vol.addEventListener("input", () => {
-        const v = Number(vol.value);
-        volText.textContent = v + "%";
-        player.setVolume(v);
-      });
+    vol.oninput = () => {
+      const v = Number(vol.value);
+      vid.volume = clamp(v/100, 0, 1);
+      volText.textContent = v + "%";
+      showToast("الصوت: " + v + "%");
+    };
 
-      speed.addEventListener("change", () => setPlaybackRateSmart(Number(speed.value)));
-      try12x.onclick = () => setPlaybackRateSmart(12);
-    }
+    speed.onchange = () => setRate(Number(speed.value));
+    try12x.onclick = () => setRate(12);
 
-    function setPlaybackRateSmart(target) {
-      const rates = (player.getAvailablePlaybackRates && player.getAvailablePlaybackRates()) || [];
-      if (!rates.length) { try { player.setPlaybackRate(target); } catch(e) {} return; }
+    seek.addEventListener("input", () => { isSeeking = true; });
+    seek.addEventListener("change", () => {
+      if (!vid.duration) return;
+      const t = (Number(seek.value)/1000) * vid.duration;
+      vid.currentTime = t;
+      isSeeking = false;
+    });
 
-      let chosen = target;
-      if (!rates.includes(target)) {
-        chosen = rates.reduce((best, r) =>
-          Math.abs(r - target) < Math.abs(best - target) ? r : best
-        , rates[0]);
-      }
-      try { player.setPlaybackRate(chosen); } catch(e) {}
-
-      const actual = player.getPlaybackRate ? player.getPlaybackRate() : chosen;
-      const sel = document.getElementById("speed");
-      if ([...sel.options].some(o => Number(o.value) === actual)) sel.value = String(actual);
-    }
-
-    function updateUI() {
-      if (!player || typeof player.getCurrentTime !== "function") return;
-      duration = player.getDuration() || duration || 0;
-      const current = player.getCurrentTime() || 0;
-
-      if (!isSeeking) {
-        const seek = document.getElementById("seek");
-        const value = duration ? Math.round((current / duration) * 1000) : 0;
-        seek.value = String(Math.max(0, Math.min(1000, value)));
-      }
-
-      document.getElementById("timeText").textContent = `${fmt(current)} / ${fmt(duration)}`;
-    }
-
-    function fmt(sec) {
+    function fmt(sec){
       sec = Math.max(0, Math.floor(sec || 0));
-      const m = Math.floor(sec / 60), s = sec % 60;
-      return String(m).padStart(2,"0") + ":" + String(s).padStart(2,"0");
+      const m = Math.floor(sec/60);
+      const s = sec%60;
+      return String(m).padStart(2,"0")+":"+String(s).padStart(2,"0");
     }
+
+    setInterval(() => {
+      if (!vid.duration) return;
+      if (!isSeeking){
+        const value = (vid.currentTime / vid.duration) * 1000;
+        seek.value = String(clamp(value, 0, 1000));
+      }
+      timeText.textContent = `${fmt(vid.currentTime)} / ${fmt(vid.duration)}`;
+    }, 250);
+
+    vid.addEventListener("loadedmetadata", () => {
+      timeText.textContent = `${fmt(0)} / ${fmt(vid.duration)}`;
+      vol.oninput();
+      showToast("جاهز");
+    });
+
+    vid.addEventListener("ratechange", () => {
+      // لو المتصفح رجّع السرعة لحد أقل لأي سبب
+      speed.value = String(vid.playbackRate);
+    });
+
+    vid.addEventListener("error", () => {
+      showToast("فشل تشغيل الفيديو — الرابط قد يكون مؤقت/CORS");
+    });
+
+    // اختصارات كيبورد
+    window.addEventListener("keydown", (e) => {
+      const tag = (document.activeElement && document.activeElement.tagName) || "";
+      if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA") return;
+
+      if (e.code === "Space") {
+        e.preventDefault();
+        if (vid.paused) playBtn.click(); else pauseBtn.click();
+      }
+      if (e.key.toLowerCase() === "m") {
+        vid.muted = !vid.muted;
+        showToast(vid.muted ? "كتم" : "صوت");
+      }
+      if (e.key === "ArrowRight") {
+        vid.currentTime = Math.min((vid.duration||1e9), vid.currentTime + 5);
+        showToast("+5 ثواني");
+      }
+      if (e.key === "ArrowLeft") {
+        vid.currentTime = Math.max(0, vid.currentTime - 5);
+        showToast("-5 ثواني");
+      }
+      if (e.key === "ArrowUp") {
+        const v = clamp(Math.round((vid.volume*100)+5), 0, 100);
+        vol.value = v; vol.oninput();
+      }
+      if (e.key === "ArrowDown") {
+        const v = clamp(Math.round((vid.volume*100)-5), 0, 100);
+        vol.value = v; vol.oninput();
+      }
+      if (e.key === "]") {
+        const next = clamp(Number(vid.playbackRate) + 0.25, 0.25, 12);
+        setRate(Number(next.toFixed(2)));
+      }
+      if (e.key === "[") {
+        const prev = clamp(Number(vid.playbackRate) - 0.25, 0.25, 12);
+        setRate(Number(prev.toFixed(2)));
+      }
+    });
   </script>
 </body>
 </html>
