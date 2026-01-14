@@ -4,40 +4,184 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
 
-  <!-- مهم: عدم استخدام noreferrer لأنه يمنع الـ Referer وقد يسبب 153 -->
+  <!-- مهم لتفادي Error 153 عندما يكون referrer ممنوع -->
   <meta name="referrer" content="strict-origin-when-cross-origin" />
 
-  <title>YouTube Embed Fix 153</title>
+  <title>YouTube Embed (Fix 153) + Speed</title>
 
   <style>
-    body{margin:0;padding:24px;background:#0b0f17;color:#e8eefc;font-family:Arial}
-    .wrap{max-width:900px;margin:0 auto}
-    .box{background:#121a2a;border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:16px}
-    .video{width:100%;aspect-ratio:16/9;border-radius:14px;overflow:hidden;background:#000}
-    iframe{width:100%;height:100%;border:0}
-    .note{opacity:.8;margin-top:12px;line-height:1.6;font-size:13px}
-    code{background:#0f1626;padding:2px 6px;border-radius:6px}
+    body{font-family:Arial,sans-serif;background:#0b0f17;color:#e8eefc;margin:0;padding:24px}
+    .wrap{max-width:980px;margin:0 auto}
+    .card{background:#121a2a;border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:16px}
+    .player-box{position:relative;width:100%;aspect-ratio:16/9;border-radius:14px;overflow:hidden;background:#000}
+    #player{width:100%;height:100%}
+    .row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:12px}
+    button,select,input[type="range"]{border-radius:10px;border:1px solid rgba(255,255,255,.12);background:#0f1626;color:#e8eefc;padding:10px 12px;font-size:14px}
+    button{cursor:pointer}
+    .label{font-size:13px;opacity:.9}
+    .spacer{flex:1}
+    .time{font-variant-numeric:tabular-nums;opacity:.9;font-size:13px;min-width:120px;text-align:center}
+    input[type="range"]{width:260px;padding:0;height:34px}
+    .small{font-size:12px;opacity:.75;line-height:1.6;margin-top:10px}
   </style>
 </head>
 
 <body>
   <div class="wrap">
-    <div class="box">
-      <div class="video">
-        <iframe
-          src="https://www.youtube-nocookie.com/embed/g0Cst6bEyWs?rel=0&modestbranding=1&playsinline=1"
-          title="YouTube video player"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-          allowfullscreen
-          referrerpolicy="strict-origin-when-cross-origin"
-        ></iframe>
+    <div class="card">
+      <div class="player-box">
+        <div id="player"></div>
       </div>
 
-      <div class="note">
-        إذا استمر <b>Error 153</b> فالمشكلة غالبًا ليست في الكود بل في البيئة:
-        تشغيل عبر <code>file://</code>، أو سياسة Referrer تمنع الـ Referer، أو إضافة Anti-tracker، أو Cloudflare/حماية تمنع طلبات iframe.
+      <div class="row">
+        <button id="playBtn">تشغيل</button>
+        <button id="pauseBtn">إيقاف مؤقت</button>
+        <button id="stopBtn">إيقاف</button>
+        <div class="spacer"></div>
+        <button id="muteBtn">كتم</button>
+        <button id="unmuteBtn">إلغاء الكتم</button>
+      </div>
+
+      <div class="row">
+        <span class="label">التقدم:</span>
+        <input id="seek" type="range" min="0" max="1000" value="0" />
+        <span class="time" id="timeText">00:00 / 00:00</span>
+      </div>
+
+      <div class="row">
+        <span class="label">الصوت:</span>
+        <input id="vol" type="range" min="0" max="100" value="80" />
+        <span class="label" id="volText">80%</span>
+        <div class="spacer"></div>
+        <span class="label">السرعة:</span>
+        <select id="speed">
+          <option value="0.25">0.25x</option>
+          <option value="0.5">0.5x</option>
+          <option value="0.75">0.75x</option>
+          <option value="1" selected>1x</option>
+          <option value="1.25">1.25x</option>
+          <option value="1.5">1.5x</option>
+          <option value="1.75">1.75x</option>
+          <option value="2">2x</option>
+          <option value="3">3x</option>
+          <option value="4">4x</option>
+          <option value="6">6x</option>
+          <option value="8">8x</option>
+          <option value="10">10x</option>
+          <option value="12">12x</option>
+        </select>
+        <button id="try12x">ضبط 12x</button>
+      </div>
+
+      <div class="small">
+        إذا ظهر Error 153 غالبًا السبب Referrer-Policy أو فتح الملف بـ file://؛ شغّل الصفحة من localhost. :contentReference[oaicite:1]{index=1}
       </div>
     </div>
   </div>
+
+  <script src="https://www.youtube.com/iframe_api"></script>
+  <script>
+    const VIDEO_ID = "g0Cst6bEyWs";
+
+    let player, duration = 0, uiTimer = null, isSeeking = false;
+
+    function onYouTubeIframeAPIReady() {
+      player = new YT.Player("player", {
+        videoId: VIDEO_ID,
+        host: "https://www.youtube-nocookie.com", // يساعد في بعض الحالات
+        playerVars: {
+          controls: 0,
+          rel: 0,
+          modestbranding: 1,
+          playsinline: 1,
+          enablejsapi: 1,
+          origin: window.location.origin // مهم لتهيئة الإعدادات
+        },
+        events: { onReady: onReady, onStateChange: () => updateUI() }
+      });
+    }
+
+    function onReady() {
+      player.setVolume(80);
+      setPlaybackRateSmart(12);
+      wireUI();
+      uiTimer = setInterval(updateUI, 250);
+      updateUI();
+    }
+
+    function wireUI() {
+      const playBtn = document.getElementById("playBtn");
+      const pauseBtn = document.getElementById("pauseBtn");
+      const stopBtn = document.getElementById("stopBtn");
+      const muteBtn = document.getElementById("muteBtn");
+      const unmuteBtn = document.getElementById("unmuteBtn");
+      const seek = document.getElementById("seek");
+      const vol = document.getElementById("vol");
+      const volText = document.getElementById("volText");
+      const speed = document.getElementById("speed");
+      const try12x = document.getElementById("try12x");
+
+      playBtn.onclick = () => player.playVideo();
+      pauseBtn.onclick = () => player.pauseVideo();
+      stopBtn.onclick = () => { player.stopVideo(); updateUI(); };
+      muteBtn.onclick = () => player.mute();
+      unmuteBtn.onclick = () => player.unMute();
+
+      seek.addEventListener("input", () => isSeeking = true);
+      seek.addEventListener("change", () => {
+        const v = Number(seek.value);
+        duration = player.getDuration() || duration || 0;
+        const t = duration ? (v / 1000) * duration : 0;
+        player.seekTo(t, true);
+        isSeeking = false;
+      });
+
+      vol.addEventListener("input", () => {
+        const v = Number(vol.value);
+        volText.textContent = v + "%";
+        player.setVolume(v);
+      });
+
+      speed.addEventListener("change", () => setPlaybackRateSmart(Number(speed.value)));
+      try12x.onclick = () => setPlaybackRateSmart(12);
+    }
+
+    function setPlaybackRateSmart(target) {
+      const rates = (player.getAvailablePlaybackRates && player.getAvailablePlaybackRates()) || [];
+      if (!rates.length) { try { player.setPlaybackRate(target); } catch(e) {} return; }
+
+      let chosen = target;
+      if (!rates.includes(target)) {
+        chosen = rates.reduce((best, r) =>
+          Math.abs(r - target) < Math.abs(best - target) ? r : best
+        , rates[0]);
+      }
+      try { player.setPlaybackRate(chosen); } catch(e) {}
+
+      const actual = player.getPlaybackRate ? player.getPlaybackRate() : chosen;
+      const sel = document.getElementById("speed");
+      if ([...sel.options].some(o => Number(o.value) === actual)) sel.value = String(actual);
+    }
+
+    function updateUI() {
+      if (!player || typeof player.getCurrentTime !== "function") return;
+      duration = player.getDuration() || duration || 0;
+      const current = player.getCurrentTime() || 0;
+
+      if (!isSeeking) {
+        const seek = document.getElementById("seek");
+        const value = duration ? Math.round((current / duration) * 1000) : 0;
+        seek.value = String(Math.max(0, Math.min(1000, value)));
+      }
+
+      document.getElementById("timeText").textContent = `${fmt(current)} / ${fmt(duration)}`;
+    }
+
+    function fmt(sec) {
+      sec = Math.max(0, Math.floor(sec || 0));
+      const m = Math.floor(sec / 60), s = sec % 60;
+      return String(m).padStart(2,"0") + ":" + String(s).padStart(2,"0");
+    }
+  </script>
 </body>
 </html>
